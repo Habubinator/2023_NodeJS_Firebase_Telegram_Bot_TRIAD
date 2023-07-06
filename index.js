@@ -1,9 +1,10 @@
 const TelegramBot = require('node-telegram-bot-api');
 const token = '6271769906:AAHZpJDpkWpxnxWpi8PohIZp66ZZ-1AcAxk';
 const bot = new TelegramBot(token, {polling: true});
+bot.setMyCommands([{ command: '/start', description: 'Найти чат' },
+                   { command: '/next', description: 'Завершить этот чат и найти следующий (НЕ РАБОТАЕТ)' }])
 const {initializeApp, cert} = require("firebase-admin/app")
 const {getFirestore} = require("firebase-admin/firestore")
-// const { getAnalytics } = require("firebase/analytics")
 const serviceAccount = require('./triadFirebaseKey.json')
 
 // Имплементация очереди, для оптимизации поиска
@@ -89,29 +90,6 @@ module.exports = {db}
 
 const usersDb = db.collection('users');
 
-// // Matches "/echo [whatever]"
-// bot.onText(/\/echo (.+)/, (msg, match) => {
-//   // 'msg' is the received Message from Telegram
-//   // 'match' is the result of executing the regexp above on the text content
-//   // of the message
-
-//   const chatId = msg.chat.id;
-//   const resp = match[1]; // the captured "whatever"
-
-//   // send back the matched "whatever" to the chat
-//   bot.sendMessage(chatId, resp);
-// });
-
-// // Matches "/echo [whatever]"
-// bot.onText(/\/start (.+)/, (msg, match) => {
-
-//     const chatId = msg.chat.id;
-//     const resp = match[1]; // the captured "whatever"
-  
-//     // send back the matched "whatever" to the chat
-//     bot.sendMessage(chatId, resp);
-//   });
-
 // Когда приходит сообщение боту, то оно встает в очередь в самом API 
 
 bot.on('message', async (msg) => {
@@ -120,7 +98,12 @@ bot.on('message', async (msg) => {
       const chatId = msg.chat.id;
       const userId = msg.from.id;
       createUser(userId);
-      bot.sendMessage(chatId, 'Received your message');
+      switch(msg){
+        case "/start":
+          bot.sendMessage(chatId, 'Начинаю поиск...');
+          userQueue.add(userId,chatId);
+          break;
+      }
     }
   });
   
@@ -160,10 +143,14 @@ async function checkUserNew(id){
   }
 }
 
-async function searchQuerry(){
+async function run(){
   if (userQueue.checkIfCouldBeInitialized()){
-    chatList.push(userQueue.find)
+    let listOfPeople = userQueue.find()
+    chatList.push(listOfPeople)
+    listOfPeople.forEach(element => {
+      bot.sendMessage(element.chatId, 'Собеседник найден!');
+    });
   }
 }
 
-setTimeout(searchQuerry);
+setTimeout(run);
