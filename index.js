@@ -37,24 +37,40 @@ class Queue {
 
 // Классы очереди и пользователя в очереди с заделом на будущее
 
-class userQueue{
+class UserQueue{
   constructor(){
     this.queue = new Queue()
   }
 
-  add(id){
-    this.queue.enqueue(new waitUser(id));
+  add(id,chatId){
+    this.queue.enqueue(new WaitUser(id,chatId));
   }
 
   find(){
-    
+    let arrayOfFoundPeople = [this.queue.dequeue(),
+                              this.queue.dequeue(),
+                              this.queue.dequeue()]
+    return arrayOfFoundPeople;
   }
   
+  checkIfCouldBeInitialized(){
+    if(this.queue.length >=3){
+      return true;
+    }
+    return false;
+  }
 }
 
-class waitUser{
-  constructor(id){
+class WaitUser{
+  constructor(id, chatId){
     this.id = id;
+    this.chatId = chatId;
+  }
+}
+
+class Chat{
+  constructor(listOfPeople){
+    this.listOfPeople = listOfPeople
   }
 }
 
@@ -67,6 +83,8 @@ initializeApp({
 })
 
 const db = getFirestore()
+var userQueue = new UserQueue();
+var chatList = [];
 module.exports = {db}
 
 const usersDb = db.collection('users');
@@ -141,3 +159,11 @@ async function checkUserNew(id){
     console.log(error)
   }
 }
+
+async function searchQuerry(){
+  if (userQueue.checkIfCouldBeInitialized()){
+    chatList.push(userQueue.find)
+  }
+}
+
+setTimeout(searchQuerry);
