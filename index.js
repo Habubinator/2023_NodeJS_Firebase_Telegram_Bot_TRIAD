@@ -43,8 +43,8 @@ class UserQueue{
     this.queue = new Queue()
   }
 
-  add(id,chatId){
-    this.queue.enqueue(new WaitUser(id,chatId));
+  add(id){
+    this.queue.enqueue(new WaitUser(id));
   }
 
   find(){
@@ -63,9 +63,8 @@ class UserQueue{
 }
 
 class WaitUser{
-  constructor(id, chatId){
+  constructor(id){
     this.id = id;
-    this.chatId = chatId;
   }
 }
 
@@ -93,64 +92,47 @@ const usersDb = db.collection('users');
 // Когда приходит сообщение боту, то оно встает в очередь в самом API 
 
 bot.on('message', async (msg) => {
-    if (!msg.from.is_bot) {
-      console.log(msg);
-      const chatId = msg.chat.id;
-      const userId = msg.from.id;
-      createUser(userId);
-      switch(msg){
-        case "/start":
-          bot.sendMessage(chatId, 'Начинаю поиск...');
-          userQueue.add(userId,chatId);
-          break;
-      }
+  if (!msg.from.is_bot) {
+    console.log(msg);
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    await createUser(userId);
+    switch (msg.text) {
+      case '/start':
+        bot.sendMessage(chatId, 'Начинаю поиск...');
+        userQueue.add(userId);
+        break;
     }
-  });
-  
+    run();
+  }
+});
+
 // Добавление пользователя в бд 
 
 async function createUser(id) {
-    try {
+  try {
+    const userSnapshot = await usersDb.where('id', '==', id).get();
+    if (userSnapshot.empty) {
       const userJson = {
         id: id,
         age: 0,
         reputation: 0,
         language: 'RU'
       };
-      if(await checkUserNew(id)){
-        const docRef = await usersDb.add(userJson);
-        console.log('User created with ID:', docRef.id);
-      }
-    } catch (error) {
-      console.log('Error creating user:', error);
+      const docRef = await usersDb.add(userJson);
+      console.log('User created with ID:', docRef.id);
     }
-  }
-
-// Проверка есть ли пользователь в бд
-
-async function checkUserNew(id){
-  try{
-    usersDb.get().then((querySnapshot) => {
-      querySnapshot.forEach((userDoc) => {
-          if (userDoc.data().id == id){
-            return false;
-          }
-      })
-      return true;
-  })
-  }catch(error){
-    console.log(error)
+  } catch (error) {
+    console.log('Error creating user:', error);
   }
 }
 
-async function run(){
-  if (userQueue.checkIfCouldBeInitialized()){
-    let listOfPeople = userQueue.find()
-    chatList.push(listOfPeople)
+async function run() {
+  if (userQueue.checkIfCouldBeInitialized()) {
+    let listOfPeople = userQueue.find();
+    chatList.push(listOfPeople);
     listOfPeople.forEach(element => {
-      bot.sendMessage(element.chatId, 'Собеседник найден!');
+      bot.sendMessage(element.id, 'Собеседник найден!');
     });
   }
 }
-
-setTimeout(run);
