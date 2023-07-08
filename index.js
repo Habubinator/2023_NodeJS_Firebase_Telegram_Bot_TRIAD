@@ -81,17 +81,28 @@ class UserQueue {
   }
 
   exit(userId) {
-  for (let i = this.queue.head; i < this.queue.tail; i++) {
-    if (this.queue.elements[i].id === userId) {
-      delete this.queue.elements[i]
-      break;
+    for (let i = this.queue.head; i < this.queue.tail; i++) {
+      if (this.queue.elements[i]?.id === userId) {
+        this.queue.elements[i] = undefined;
+        this.queue.head++
+        break;
+      }
     }
   }
-}
+  
 
   checkIfCouldBeInitialized() {
     if (this.queue.length >= 3) {
       return true;
+    }
+    return false;
+  }
+
+  isUserInQueue(userId) {
+    for (let i = this.queue.head; i < this.queue.tail; i++) {
+      if (this.queue.elements[i]?.id === userId) {
+        return true;
+      }
     }
     return false;
   }
@@ -130,14 +141,14 @@ bot.on('message', async (msg) => {
 
     switch (msg.text) {
       case '/start':
-        startSearch(userId);
+        await startSearch(userId);
         break;
       case '/stop':
-        stopSearchOrDialog(userId);
+        await stopSearchOrDialog(userId);
         break;
       case "/next":
         await stopSearchOrDialog(userId);
-        startSearch(userId);
+        await startSearch(userId);
         break;
     }
     run();
@@ -198,26 +209,48 @@ async function removeDuplicateUsers() {
 }
 
 async function startSearch(userId){
-  bot.sendMessage(userId, 'Начинаю поиск...');
-  userQueue.add(userId);
+  let text;
+  if(userQueue.isUserInQueue(userId)){
+    text = "Вы уже в поиске"
+  }else{
+    text = 'Начинаю поиск...'
+    userQueue.add(userId);
+  }
+  bot.sendMessage(userId, text);
 }
 
 async function stopSearchOrDialog(userId) {
+  let isDialog = checkIfUserInDialog(userId);
+  if (isDialog) {
+    removeFromDialog(userId);
+  } else {
+    checkAndExitFromQueue(userId);
+  }
+}
+
+function checkIfUserInDialog(userId) {
   let isDialog = false;
-  chatList.forEach(element1 => {
+  chatList.forEach((element1) => {
     element1.forEach((element2, index) => {
-      if (element2.id === userId) {
-        element1[index] = undefined; // Оновлення елемента в масиві
+      if (element2?.id === userId) {
         isDialog = true;
         bot.sendMessage(userId, "Вы покинули диалог");
+        element1[index] = undefined; // Оновлення елемента в масиві
       }
     });
   });
-  if (!isDialog) {
+  return isDialog;
+}
+
+function checkAndExitFromQueue(userId) {
+  if (userQueue.isUserInQueue(userId)) {
     userQueue.exit(userId);
     bot.sendMessage(userId, "Вы покинули поиск");
+  } else {
+    bot.sendMessage(userId, "Вы не в поиске");
   }
 }
+
 
 
 // основаня функция запуска
