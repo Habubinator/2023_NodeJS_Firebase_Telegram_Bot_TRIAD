@@ -150,6 +150,13 @@ bot.on('message', async (msg) => {
         await stopSearchOrDialog(userId);
         await startSearch(userId);
         break;
+      default:
+        if(checkIfUserInDialog()){
+          forwardMessageToUsers(userId, msg.text)
+        }else{
+          bot.sendMessage(userId, "Вы ещё не в диалоге")
+        }
+        break;
     }
     run();
   }
@@ -222,24 +229,28 @@ async function startSearch(userId){
 async function stopSearchOrDialog(userId) {
   let isDialog = checkIfUserInDialog(userId);
   if (isDialog) {
-    removeFromDialog(userId);
+    chatList.forEach((element1) => {
+      element1.forEach((element2, index) => {
+        if (element2.id === userId) {
+          bot.sendMessage(userId, "Вы покинули диалог");
+          delete element1[index]; // Оновлення елемента в масиві
+        }
+      });
+    });
   } else {
     checkAndExitFromQueue(userId);
   }
 }
 
 function checkIfUserInDialog(userId) {
-  let isDialog = false;
   chatList.forEach((element1) => {
-    element1.forEach((element2, index) => {
-      if (element2?.id === userId) {
-        isDialog = true;
-        bot.sendMessage(userId, "Вы покинули диалог");
-        element1[index] = undefined; // Оновлення елемента в масиві
+    element1.forEach((element2) => {
+      if (element2.id == userId) {
+        return true;
       }
     });
   });
-  return isDialog;
+  return false;
 }
 
 function checkAndExitFromQueue(userId) {
@@ -252,6 +263,27 @@ function checkAndExitFromQueue(userId) {
 }
 
 
+function forwardMessageToUsers(senderId, message) {
+  const chat = findChatOfUser(senderId);
+  if (chat) {
+    chat.forEach((waitUser) => {
+      if (waitUser?.id !== senderId) {
+        bot.sendMessage(waitUser.id, message);
+      }
+    });
+  }
+}
+
+function findChatOfUser(senderId){
+  chatList.forEach((chat) => {
+    chat.forEach((waitUser) => {
+      if (waitUser.id == senderId) {
+        return chat
+      }
+    });
+  });
+  return null;
+}
 
 // основаня функция запуска
 
