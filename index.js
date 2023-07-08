@@ -233,7 +233,7 @@ async function stopSearchOrDialog(userId) {
       element1.forEach((element2, index) => {
         if (element2.id === userId) {
           bot.sendMessage(userId, "Вы покинули диалог");
-          delete element1[index]; // Оновлення елемента в масиві
+          delete element1[index];
         }
       });
     });
