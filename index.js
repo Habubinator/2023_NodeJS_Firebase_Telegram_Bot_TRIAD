@@ -3,7 +3,8 @@ const token = '6271769906:AAHZpJDpkWpxnxWpi8PohIZp66ZZ-1AcAxk';
 const bot = new TelegramBot(token, {polling: true});
 bot.setMyCommands([{ command: '/start', description: 'Найти чат' },
                    { command: '/next', description: 'Найти следующий диалог' },
-                   { command: '/stop', description: 'Завершить этот диалог' }])
+                   { command: '/stop', description: 'Завершить этот диалог' },
+                   { command: '/share', description: 'Поделиться своим аккаунтом'}])
 const {initializeApp, cert} = require("firebase-admin/app")
 const {getFirestore} = require("firebase-admin/firestore")
 const serviceAccount = require('./triadFirebaseKey.json')
@@ -112,6 +113,22 @@ class UserQueue {
 class WaitUser{
   constructor(id){
     this.id = id;
+    this.colour = this.pickColour(userQueue.queue.tail+1)
+  }
+   
+  pickColour(colourCode){
+    let temp = colourCode%3
+    switch (temp){
+      case 0:
+        this.colour = "🟥"
+        break;
+      case 1:
+        this.colour = "🟩"
+        break;
+      case 2:
+        this.colour = "🟦"
+        break;
+    }
   }
 }
 
@@ -150,9 +167,16 @@ bot.on('message', async (msg) => {
         await stopSearchOrDialog(userId);
         await startSearch(userId);
         break;
+      case "/share":
+        if(checkIfUserInDialog(userId)){
+          forwardLinkToUsers(userId)
+        }else{
+          bot.sendMessage(userId, "Вы ещё не в диалоге")
+        }
+        break;
       default:
-        if(checkIfUserInDialog()){
-          forwardMessageToUsers(userId, msg.text)
+        if(checkIfUserInDialog(userId)){
+          forwardMessageToUsers(userId, msg)
         }else{
           bot.sendMessage(userId, "Вы ещё не в диалоге")
         }
@@ -228,29 +252,34 @@ async function startSearch(userId){
 
 async function stopSearchOrDialog(userId) {
   let isDialog = checkIfUserInDialog(userId);
+  let leave = false;
   if (isDialog) {
     chatList.forEach((element1) => {
       element1.forEach((element2, index) => {
-        if (element2.id === userId) {
-          bot.sendMessage(userId, "Вы покинули диалог");
+        if (element2.id == userId) {
+          leave = true
           delete element1[index];
         }
       });
     });
+    if(leave){
+      bot.sendMessage(userId, "Вы покинули диалог");
+    }
   } else {
     checkAndExitFromQueue(userId);
   }
 }
 
 function checkIfUserInDialog(userId) {
+  let returnStatement = false
   chatList.forEach((element1) => {
     element1.forEach((element2) => {
       if (element2.id == userId) {
-        return true;
+        returnStatement = true;
       }
     });
   });
-  return false;
+  return returnStatement;
 }
 
 function checkAndExitFromQueue(userId) {
@@ -265,24 +294,83 @@ function checkAndExitFromQueue(userId) {
 
 function forwardMessageToUsers(senderId, message) {
   const chat = findChatOfUser(senderId);
+  const sender = findUser(senderId);
   if (chat) {
     chat.forEach((waitUser) => {
-      if (waitUser?.id !== senderId) {
-        bot.sendMessage(waitUser.id, message);
+      if (waitUser.id != senderId) {
+        try {
+          if(message.text){
+            bot.sendMessage(waitUser.id, `Аноним ${sender.colour} :` + message.text);
+          }else if (message.sticker){
+            bot.sendMessage(waitUser.id, `Аноним ${sender.colour}:`).then(() => {
+            bot.sendSticker(waitUser.id, message.sticker.file_id);
+            })
+          } else if(message.photo){
+            bot.sendMessage(waitUser.id, `Аноним ${sender.colour}:`).then(() => {
+              bot.sendPhoto(waitUser.id, message.photo.file_id);
+            })
+          } else if(message.video){
+            bot.sendMessage(waitUser.id, `Аноним ${sender.colour}:`).then(() => {
+              bot.sendPhoto(waitUser.id, message.video.file_id);
+            })
+          } else if(message.voice){
+            bot.sendMessage(waitUser.id, `Аноним ${sender.colour}:`).then(() => {
+              bot.sendPhoto(waitUser.id, message.voice.file_id);
+            })
+          }else if(message.video_note){
+            bot.sendMessage(waitUser.id, `Аноним ${sender.colour}:`).then(() => {
+              bot.sendPhoto(waitUser.id, message.video_note.file_id);
+            })
+          }else if(message.document){
+            bot.sendMessage(waitUser.id, `Аноним ${sender.colour}:`).then(() => {
+              bot.sendPhoto(waitUser.id, message.document.file_id);
+            })
+          }
+        } catch (error) {
+          bot.sendMessage(senderId,"Неподдерживаемый тип сообщения")
+        }
+      }
+    });
+  }
+}
+
+function forwardLinkToUsers(senderId){
+  const chat = findChatOfUser(senderId);
+  if (chat) {
+    chat.forEach((waitUser) => {
+      if (waitUser.id != senderId) {
+        bot.sendMessage(waitUser.id, `Пользователь поделился <a href="tg://user?id=${senderId}">ссылкой на свой аккаунт</a>`, {disable_web_page_preview: true,
+        parse_mode: `HTML`});
+      }else{
+        bot.sendMessage(waitUser.id, `Вы поделились <a href="tg://user?id=${senderId}">ссылкой на свой аккаунт</a>`, {disable_web_page_preview: true,
+        parse_mode: `HTML`});
       }
     });
   }
 }
 
 function findChatOfUser(senderId){
+  let isChat = null
   chatList.forEach((chat) => {
     chat.forEach((waitUser) => {
       if (waitUser.id == senderId) {
-        return chat
+        isChat = chat
       }
     });
   });
-  return null;
+  return isChat;
+}
+
+function findUser(senderId){
+  let isUser = null
+  chatList.forEach((chat) => {
+    chat.forEach((waitUser) => {
+      if (waitUser.id == senderId) {
+        isUser = waitUser
+      }
+    });
+  });
+  return isUser;
 }
 
 // основаня функция запуска
@@ -292,7 +380,7 @@ async function run() {
     let listOfPeople = userQueue.find();
     chatList.push(listOfPeople);
     listOfPeople.forEach(element => {
-      bot.sendMessage(element.id, 'Собеседник найден!');
+      bot.sendMessage(element.id, `Собеседник найден! \nВаш цвет: ${element.colour}`);
     });
   }
 }
