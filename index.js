@@ -69,8 +69,8 @@ class UserQueue {
     this.queue = new Queue();
   }
 
-  add(id) {
-    this.queue.enqueue(new WaitUser(id));
+  add(id, username) {
+    this.queue.enqueue(new WaitUser(id, username));
   }
 
   find() {
@@ -112,8 +112,9 @@ class UserQueue {
 
 
 class WaitUser{
-  constructor(id){
+  constructor(id, username){
     this.id = id;
+    this.username = username
     this.colour = this.pickColour(userQueue.queue.tail)
   }
    
@@ -125,7 +126,7 @@ class WaitUser{
       case 1:
         return "🟩"
       case 2:
-        return"🟦"
+        return "🟦"
     }
   }
 }
@@ -140,6 +141,7 @@ initializeApp({
 
 const db = getFirestore()
 var userQueue = new UserQueue();
+var joinQueue = new UserQueue();
 var chatList = [];
 module.exports = {db}
 
@@ -151,17 +153,21 @@ bot.on('message', async (msg) => {
   if (!msg.from.is_bot) {
     console.log(msg);
     const userId = msg.from.id;
+    const username = msg.from.username;
     await createUser(userId);
     switch (msg.text) {
       case '/start':
-        await startSearch(userId);
+        await startSearch(userId,username);
+        break;
+      case '/join':
+        await joinChat(userId,username);
         break;
       case '/stop':
         await stopSearchOrDialog(userId);
         break;
       case "/next":
         await stopSearchOrDialog(userId);
-        await startSearch(userId);
+        await startSearch(userId, username);
         break;
       case "/share":
         if(checkIfUserInDialog(userId)){
@@ -235,13 +241,38 @@ async function removeDuplicateUsers() {
   }
 }
 
-async function startSearch(userId){
+async function startSearch(userId, username){
+  let text;
+  if(joinQueue.isUserInQueue(userId)){
+    joinQueue.exit(userId)
+  }
+  if(checkIfUserInDialog(userId)){
+    text = "Вы уже в диалоге"
+  }else{
+    if(userQueue.isUserInQueue(userId)){
+      text = "Вы уже в поиске"
+    }else{
+      text = 'Начинаю поиск...'
+      userQueue.add(userId, username);
+    }
+  }
+  bot.sendMessage(userId, text);
+}
+
+async function joinChat(userId, username){
   let text;
   if(userQueue.isUserInQueue(userId)){
-    text = "Вы уже в поиске"
+    userQueue.exit(userId)
+  }
+  if(checkIfUserInDialog(userId)){
+    text = "Вы уже в диалоге"
   }else{
-    text = 'Начинаю поиск...'
-    userQueue.add(userId);
+    if(joinQueue.isUserInQueue(userId)){
+      text = "Вы уже в поиске"
+    }else{
+      text = 'Ждем освобождения места в чате...'
+      joinQueue.add(userId, username);
+    }
   }
   bot.sendMessage(userId, text);
 }
@@ -267,6 +298,11 @@ async function stopSearchOrDialog(userId) {
         chatOfLeaver.forEach((waitUser) => {
           bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji> цвета, покинул диалог `, 
           {disable_web_page_preview: true, parse_mode: `HTML`});
+          chatList.forEach( (element, index) => {
+            if(element.length <= 1){
+              chatList.splice(index, 1);
+            }
+          })
         });
       }
     }
@@ -288,7 +324,7 @@ function checkIfUserInDialog(userId) {
 }
 
 function checkAndExitFromQueue(userId) {
-  if (userQueue.isUserInQueue(userId)) {
+  if (userQueue.isUserInQueue(userId)||joinQueue.isUserInQueue(userId)) {
     userQueue.exit(userId);
     bot.sendMessage(userId, "Вы покинули поиск");
   } else {
@@ -348,13 +384,14 @@ function forwardMessageToUsers(senderId, message) {
 
 function forwardLinkToUsers(senderId){
   const chat = findChatOfUser(senderId);
+  let tempuser = findUser(senderId)
   if (chat) {
     chat.forEach((waitUser) => {
-      if (waitUser.id != senderId) {
-        bot.sendMessage(waitUser.id, `Пользователь поделился <a href="tg://user?id=${senderId}">ссылкой на свой аккаунт</a>`, {disable_web_page_preview: true,
+      if (waitUser.id != senderId) {                                                 
+        bot.sendMessage(waitUser.id, `Пользователь цвета ${tempuser.colour} поделился <a href="t.me/${tempuser.username}">ссылкой на свой аккаунт</a>: `, {disable_web_page_preview: true,
         parse_mode: `HTML`});
       }else{
-        bot.sendMessage(waitUser.id, `Вы поделились <a href="tg://user?id=${senderId}">ссылкой на свой аккаунт</a>`, {disable_web_page_preview: true,
+        bot.sendMessage(waitUser.id, `Вы поделились <a href="t.me/${tempuser.username}">ссылкой на свой аккаунт </a>`, {disable_web_page_preview: true,
         parse_mode: `HTML`});
       }
     });
@@ -388,11 +425,6 @@ function findUser(senderId){
 // основаня функция запуска
 
 async function run() {
-  chatList.forEach( (element, index) => {
-    if(element.length <= 1){
-      chatList.splice(index, 1);
-    }
-  })
   if (userQueue.checkIfCouldBeInitialized()) {
     let listOfPeople = userQueue.find();
     chatList.push(listOfPeople);
@@ -400,6 +432,28 @@ async function run() {
       bot.sendMessage(element.id, `Собеседник найден! \nВаш цвет: <tg-emoji emoji-id="5368324170671202286">${element.colour}</tg-emoji>`,{disable_web_page_preview: true,
         parse_mode: `HTML`});
     });
+  }
+
+  if (joinQueue.queue.length > 0) {
+    chatWithoutUser = chatList.filter(chat => chat.length !== 3)[0]
+    if(chatWithoutUser){
+      let colours = ["🟥","🟩","🟦"]
+      let joinedUser = joinQueue.queue.dequeue()
+      chatWithoutUser.forEach(element => {
+        colours.forEach((element1, index) => {
+          if(element1 == element.colour){
+            colours.splice(index, 1);
+          }
+        })
+      })
+
+      joinedUser.colour = colours[0]
+      chatWithoutUser.forEach(element => {
+        bot.sendMessage(element.id, "К вам подключился новый аноним! \nЕго цвет: " + joinedUser.colour)
+      })
+      bot.sendMessage(joinedUser.id, "Вы подключились к чату! \nВаш цвет: " + joinedUser.colour)
+      chatWithoutUser.push(joinedUser)
+    }
   }
 }
 
