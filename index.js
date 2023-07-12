@@ -247,26 +247,26 @@ async function startSearch(userId){
 
 async function stopSearchOrDialog(userId) {
   let isDialog = checkIfUserInDialog(userId);
+  let sender = findUser(userId);
   let leave = false;
   let chatOfLeaver;
   if (isDialog) {
     chatList.forEach((element1) => {
       element1.forEach((element2, index) => {
         if (element2.id == userId) {
-          leave = true
-          delete element1[index];
-          chatOfLeaver = element1
+          leave = true;
+          element1.splice(index, 1);
+          chatOfLeaver = element1;
         }
       });
     });
-    if(leave){
+    if (leave) {
       bot.sendMessage(userId, "Вы покинули диалог");
-      const sender = findUser(userId);
       if (chatOfLeaver) {
         chatOfLeaver.forEach((waitUser) => {
-          bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji> цвета, покинул диалог `, {disable_web_page_preview: true,
-            parse_mode: `HTML`})
-        })
+          bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji> цвета, покинул диалог `, 
+          {disable_web_page_preview: true, parse_mode: `HTML`});
+        });
       }
     }
   } else {
@@ -387,6 +387,11 @@ function findUser(senderId){
 // основаня функция запуска
 
 async function run() {
+  chatList.forEach( (element, index) => {
+    if(element.length <= 1){
+      chatList.splice(index, 1);
+    }
+  })
   if (userQueue.checkIfCouldBeInitialized()) {
     let listOfPeople = userQueue.find();
     chatList.push(listOfPeople);
