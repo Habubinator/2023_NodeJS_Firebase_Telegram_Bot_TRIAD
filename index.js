@@ -2,6 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const token = '6271769906:AAHZpJDpkWpxnxWpi8PohIZp66ZZ-1AcAxk';
 const bot = new TelegramBot(token, {polling: true});
 bot.setMyCommands([{ command: '/start', description: 'Найти чат' },
+                   { command: '/join', description: 'Подключиться к активному чату' },
                    { command: '/next', description: 'Найти следующий диалог' },
                    { command: '/stop', description: 'Завершить этот диалог' },
                    { command: '/share', description: 'Поделиться своим аккаунтом'}])
