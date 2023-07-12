@@ -113,21 +113,18 @@ class UserQueue {
 class WaitUser{
   constructor(id){
     this.id = id;
-    this.colour = this.pickColour(userQueue.queue.tail+1)
+    this.colour = this.pickColour(userQueue.queue.tail)
   }
    
   pickColour(colourCode){
     let temp = colourCode%3
     switch (temp){
       case 0:
-        this.colour = "🟥"
-        break;
+        return "🟥"
       case 1:
-        this.colour = "🟩"
-        break;
+        return "🟩"
       case 2:
-        this.colour = "🟦"
-        break;
+        return"🟦"
     }
   }
 }
@@ -154,7 +151,6 @@ bot.on('message', async (msg) => {
     console.log(msg);
     const userId = msg.from.id;
     await createUser(userId);
-
     switch (msg.text) {
       case '/start':
         await startSearch(userId);
@@ -252,17 +248,26 @@ async function startSearch(userId){
 async function stopSearchOrDialog(userId) {
   let isDialog = checkIfUserInDialog(userId);
   let leave = false;
+  let chatOfLeaver;
   if (isDialog) {
     chatList.forEach((element1) => {
       element1.forEach((element2, index) => {
         if (element2.id == userId) {
           leave = true
           delete element1[index];
+          chatOfLeaver = element1
         }
       });
     });
     if(leave){
       bot.sendMessage(userId, "Вы покинули диалог");
+      const sender = findUser(userId);
+      if (chatOfLeaver) {
+        chatOfLeaver.forEach((waitUser) => {
+          bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji> цвета, покинул диалог `, {disable_web_page_preview: true,
+            parse_mode: `HTML`})
+        })
+      }
     }
   } else {
     checkAndExitFromQueue(userId);
@@ -299,7 +304,7 @@ function forwardMessageToUsers(senderId, message) {
       if (waitUser.id != senderId) {
         try {
           if(message.text){
-            bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:` + toEscapeMSg(message.text), {disable_web_page_preview: true,
+            bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:\n` + toEscapeMSg(message.text), {disable_web_page_preview: true,
               parse_mode: `HTML`});
           }else if (message.sticker){
             bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:`, {disable_web_page_preview: true,
@@ -309,27 +314,27 @@ function forwardMessageToUsers(senderId, message) {
           } else if(message.photo){
             bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:`, {disable_web_page_preview: true,
               parse_mode: `HTML`}).then(() => {
-              bot.sendPhoto(waitUser.id, message.photo.file_id);
+              bot.sendPhoto(waitUser.id, message.photo[3].file_id);
             })
           } else if(message.video){
             bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:`, {disable_web_page_preview: true,
               parse_mode: `HTML`}).then(() => {
-              bot.sendPhoto(waitUser.id, message.video.file_id);
+              bot.sendVideo(waitUser.id, message.video.file_id);
             })
           } else if(message.voice){
             bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:`, {disable_web_page_preview: true,
               parse_mode: `HTML`}).then(() => {
-              bot.sendPhoto(waitUser.id, message.voice.file_id);
+              bot.sendVoice(waitUser.id, message.voice.file_id);
             })
           }else if(message.video_note){
             bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:`, {disable_web_page_preview: true,
               parse_mode: `HTML`}).then(() => {
-              bot.sendPhoto(waitUser.id, message.video_note.file_id);
+              bot.sendVideoNote(waitUser.id, message.video_note.file_id);
             })
           }else if(message.document){
             bot.sendMessage(waitUser.id, `Аноним<tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:`, {disable_web_page_preview: true,
               parse_mode: `HTML`}).then(() => {
-              bot.sendPhoto(waitUser.id, message.document.file_id);
+              bot.sendDocument(waitUser.id, message.document.file_id);
             })
           }
         } catch (error) {
