@@ -116,7 +116,7 @@ class WaitUser{
   constructor(id, username){
     this.id = id;
     this.username = username
-    this.kickPoints;
+    this.kickPoints = 0;
     this.colour = this.pickColour(userQueue.queue.tail)
   }
    
@@ -180,7 +180,24 @@ bot.on('message', async (msg) => {
         }
         break;
       case "/kick":
-        pickUserToKick(userId);
+        if(!checkIfUserKicked(userId)){
+          pickUserToKick(userId);
+        }else{
+          bot.sendMessage(userId, "Вы уже проголосовали")
+        }
+        break;
+      case "/online":
+        try {
+          let counter = 0;
+          chatList.forEach(index => {
+            counter += index.length
+          })
+          counter += userQueue.length
+          counter += joinQueue.length
+          bot.sendMessage(userId, "Текущий онлайн: "+ counter + " человек")
+        } catch (error) {
+          console.log(error)
+        }
         break;
       default:
         if(checkIfUserInDialog(userId)){
@@ -207,15 +224,20 @@ bot.on('callback_query', function onCallbackQuery(callbackQuery) {
   if(action[0] == "kick"){
     var kicked = findUser(action[1])
     var kicker = findUser(action[2])
-    var chat = findChatOfUser(kicker)
+    var chat = findChatOfUser(kicked.id)
     var otherPerson;
     chat.forEach(kickPerson => {
       if(kickPerson.id != kicked.id && kickPerson.id != kicker.id){
         otherPerson = kickPerson;
       }
     })
-    if(kicked.kickPoints++ >= 2){
-      bot.sendMessage(otherPerson, `Аноним <tg-emoji emoji-id="5368324170671202286">${kicker.colour}</tg-emoji>`+
+    kickAwaitArray.forEach(persons => {
+      if(kicker.id == persons[0]){
+        persons.push(kicked.id)
+      }
+    })
+    if(++kicked.kickPoints < 2){
+      bot.sendMessage(otherPerson.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${kicker.colour}</tg-emoji>`+
           `хочет выгнать из диалога анонима <tg-emoji emoji-id="5368324170671202286">${kicked.colour}</tg-emoji>.`+
           `\n Нажмите команду /kick, чтобы проголосовать за, или против`,{disable_web_page_preview: true,
             parse_mode: `HTML`})
@@ -223,8 +245,8 @@ bot.on('callback_query', function onCallbackQuery(callbackQuery) {
         parse_mode: `HTML`})
       bot.editMessageText(`Вы успешно проголосовали за <tg-emoji emoji-id="5368324170671202286">${kicked.colour}</tg-emoji>`, opts);
     }else{
-      bot.sendMessage(kicker.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${kicked.colour}</tg-emoji> был выгнан`)
-      bot.sendMessage(otherPerson.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${kicked.colour}</tg-emoji> был выгнан`)
+      bot.sendMessage(kicker.id, `Аноним ${kicked.colour} был выгнан`)
+      bot.sendMessage(otherPerson.id, `Аноним ${kicked.colour} был выгнан`)
       stopSearchOrDialog(kicked.id)
     }
   }
@@ -337,27 +359,20 @@ async function stopSearchOrDialog(userId) {
     });
     if (leave) {
       let text;
-      if(sender.kickPoints++ >= 2){
-        text = "Bac выгнали из диалога"
-      }else text = "Вы покинули диалог";
+      if (sender.kickPoints >= 2) {
+        text = "Bac выгнали из диалога";
+      } else {
+        text = "Вы покинули диалог";
+      }
       bot.sendMessage(userId, text).then(() => {
-        kickAwaitArray.forEach((personArray, index )=> {
-          if(userId == personArray[0]){
-            bot.deleteMessage(userId,personArray[1])
-            kickAwaitArray.splice(index,1)
-          }
-        })
-      })
+        kickAwaitArray = kickAwaitArray.filter(personArray => personArray[1] !== userId);
+      });
       if (chatOfLeaver) {
-        if(sender.kickPoints < 2){
+        if (sender.kickPoints < 2) {
           chatOfLeaver.forEach((waitUser) => {
-            bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji> цвета, покинул диалог `, 
-            {disable_web_page_preview: true, parse_mode: `HTML`});
-            chatList.forEach( (element, index) => {
-              if(element.length <= 1){
-                chatList.splice(index, 1);
-              }
-            })
+            bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji> цвета, покинул диалог `,
+              { disable_web_page_preview: true, parse_mode: `HTML` });
+            chatList = chatList.filter(element => element.length > 1);
           });
         }
       }
@@ -367,6 +382,7 @@ async function stopSearchOrDialog(userId) {
     checkAndExitFromQueue(userId);
   }
 }
+
 
 function checkIfUserInDialog(userId) {
   let returnStatement = false
@@ -389,6 +405,15 @@ function checkAndExitFromQueue(userId) {
   }
 }
 
+function checkIfUserKicked(senderId){
+  let result = false;
+  kickAwaitArray.forEach(person => {
+    if(person[0] == senderId){
+      result = true;
+    }
+  })
+  return result;
+}
 
 function forwardMessageToUsers(senderId, message) {
   const chat = findChatOfUser(senderId);
@@ -480,28 +505,32 @@ function findUser(senderId){
 }
 
 async function pickUserToKick(senderId){
-  let chat = findChatOfUser(senderId);
-  if(chat.length == 3){
-    var persons; 
-    chat.forEach(person => {
-      if(person.id != senderId){
-        persons.push(person)
-      }
-    })
-
-    var buttonOptions = {
-      reply_markup: JSON.stringify({
-        inline_keyboard: [
-          [{ text: `${persons[0].colour}`, callback_data: `kick|${persons[0].id}|${senderId}` }],
-          [{ text: `${persons[1].colour}`, callback_data: `kick|${persons[1].id}|${senderId}` }]
-        ]
+  try {
+    let chat = findChatOfUser(senderId);
+    if(chat.length == 3){
+      var persons = []; 
+      chat.forEach(person => {
+        if(person.id != senderId){
+          persons.push(person)
+        }
       })
-    };
-    
-    kickAwaitArray.push([senderId, await bot.sendMessage(senderId, "Проголосовать за исключение: ", buttonOptions)])
-  }else{
-    bot.sendMessage(senderId, "Невозможно запустить голосование, если кто-то вышел")
-  } 
+
+      var buttonOptions = {
+        reply_markup: JSON.stringify({
+          inline_keyboard: [
+            [{ text: `${persons[0].colour}`, callback_data: `kick|${persons[0].id}|${senderId}` }],
+            [{ text: `${persons[1].colour}`, callback_data: `kick|${persons[1].id}|${senderId}` }]
+          ]
+        })
+      };
+      await bot.sendMessage(senderId, "Проголосовать за исключение: ", buttonOptions)
+      kickAwaitArray.push([senderId])
+    }else{
+      await bot.sendMessage(senderId, "Невозможно запустить голосование, если кто-то вышел")
+    } 
+  } catch (error) {
+    console.log(error)
+  }
 }
 
 // основаня функция запуска
