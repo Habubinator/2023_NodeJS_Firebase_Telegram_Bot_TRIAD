@@ -6,7 +6,8 @@ bot.setMyCommands([{ command: '/start', description: 'Найти чат' },
                    { command: '/next', description: 'Найти следующий диалог' },
                    { command: '/stop', description: 'Завершить этот диалог' },
                    { command: '/kick', description: "Голосование за исключение"},
-                   { command: '/share', description: 'Поделиться своим аккаунтом'}])
+                   { command: '/share', description: 'Поделиться своим аккаунтом'},
+                   { command: "/report_bug", description: "Уведомить oб ошибке"}])
 const {initializeApp, cert} = require("firebase-admin/app")
 const {getFirestore} = require("firebase-admin/firestore")
 const serviceAccount = require('./triadFirebaseKey.json')
@@ -157,7 +158,7 @@ bot.on('message', async (msg) => {
     console.log(msg);
     const userId = msg.from.id;
     const username = msg.from.username;
-    await createUser(userId, username);
+    await createUser(userId, username, msg);
     switch (msg.text) {
       case '/start':
         await startSearch(userId,username);
@@ -187,17 +188,10 @@ bot.on('message', async (msg) => {
         }
         break;
       case "/online":
-        try {
-          let counter = 0;
-          chatList.forEach(index => {
-            counter += index.length
-          })
-          counter += userQueue.queue.length
-          counter += joinQueue.queue.length
-          bot.sendMessage(userId, "Текущий онлайн: "+ counter + " человек")
-        } catch (error) {
-          console.log(error)
-        }
+        getOnline(userId);
+        break;
+      case "/report_bug":
+        bot.sendMessage(userId, "Написать разработчику можно тут:\nhttps://forms.gle/WtXAR18VboHfbGvf6")
         break;
       default:
         if(checkIfUserInDialog(userId)){
@@ -254,7 +248,7 @@ bot.on('callback_query', function onCallbackQuery(callbackQuery) {
 
 // Добавление пользователя в бд 
 
-async function createUser(id, username) {
+async function createUser(id, username, msg) {
   try {
     const userSnapshot = await usersDb.where('username', '==', username).get();
     if (userSnapshot.empty) {
@@ -263,7 +257,7 @@ async function createUser(id, username) {
         username: username,
         age: 0,
         reputation: 0,
-        language: 'RU'
+        language: msg.from.language_code
       };
       const docRef = await usersDb.add(userJson);
       console.log('User created with ID:', docRef.id);
@@ -574,6 +568,20 @@ function toEscapeMSg(string){
       .replace(">", "&gt")
       .replace("&", "&amp")
       .replace("\"", "&quot")
+}
+
+function getOnline(userId){
+  try {
+    let counter = 0;
+    chatList.forEach(index => {
+      counter += index.length
+    })
+    counter += userQueue.queue.length
+    counter += joinQueue.queue.length
+    bot.sendMessage(userId, "Текущий онлайн: "+ counter + " человек")
+  } catch (error) {
+    console.log(error)
+  }
 }
 
 removeDuplicateUsers();
