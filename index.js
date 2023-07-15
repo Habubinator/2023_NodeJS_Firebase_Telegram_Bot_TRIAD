@@ -8,6 +8,8 @@ bot.setMyCommands([{ command: '/start', description: 'Найти чат' },
                    { command: '/kick', description: "Голосование за исключение"},
                    { command: '/share', description: 'Поделиться своим аккаунтом'},
                    { command: "/report_bug", description: "Уведомить oб ошибке"}])
+                   // ,
+                   // { command: "/donate", description: "Отблагодарить разраба"}
 const {initializeApp, cert} = require("firebase-admin/app")
 const {getFirestore} = require("firebase-admin/firestore")
 const serviceAccount = require('./triadFirebaseKey.json')
@@ -112,7 +114,6 @@ class UserQueue {
   }
 }
 
-
 class WaitUser{
   constructor(id, username){
     this.id = id;
@@ -193,6 +194,9 @@ bot.on('message', async (msg) => {
       case "/report_bug":
         bot.sendMessage(userId, "Написать разработчику можно тут:\nhttps://forms.gle/WtXAR18VboHfbGvf6")
         break;
+      case "/donate":
+        openDonutButton(userId);
+        break;
       default:
         if(checkIfUserInDialog(userId)){
           forwardMessageToUsers(userId, msg)
@@ -243,6 +247,17 @@ bot.on('callback_query', function onCallbackQuery(callbackQuery) {
       bot.sendMessage(otherPerson.id, `Аноним ${kicked.colour} был выгнан`)
       stopSearchOrDialog(kicked.id)
     }
+  }else if(action[0] == "donate"){
+    senderId = action[1];
+    price_amount = +action[2]
+    let price = [ {label: "На корм котикам", amount: 2500},
+                  {label: "На корм котикам", amount: 5000},
+                  {label: "На корм котикам", amount: 10000},
+                  {label: "На корм котикам", amount: 20000},
+                  {label: "На корм котикам", amount: 50000}
+              ]
+    bot.sendInvoice(senderId,"На корм котикам 🐈", "Если вам нравится то, что я сделал, то поддержите будущие мои проекты", 
+  "donate","535936410:LIVE:6271769906_1c7d48e4-261d-42b3-8cef-d4da926124c5", "UAH", [price[price_amount]])
   }
 });
 
@@ -568,6 +583,25 @@ function toEscapeMSg(string){
       .replace(">", "&gt")
       .replace("&", "&amp")
       .replace("\"", "&quot")
+}
+
+/*
+
+*/
+
+async function openDonutButton(userId){
+  var buttonOptions = {
+    reply_markup: JSON.stringify({
+      inline_keyboard: [
+        [{ text: `Донат в 25 грн`, callback_data: `donate|${userId}|0`}],
+        [{ text: `Донат в 50 грн`, callback_data: `donate|${userId}|1`}],
+        [{ text: `Донат в 100 грн`, callback_data: `donate|${userId}|2`}],
+        [{ text: `Донат в 200 грн`, callback_data: `donate|${userId}|3`}],
+        [{ text: `Донат в 500 грн`, callback_data: `donate|${userId}|4`}]
+      ]
+    })
+  };
+  await bot.sendMessage(userId, "Выберите пожертвование:", buttonOptions)
 }
 
 function getOnline(userId){
