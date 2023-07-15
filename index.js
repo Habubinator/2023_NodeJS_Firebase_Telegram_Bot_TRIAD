@@ -192,8 +192,8 @@ bot.on('message', async (msg) => {
           chatList.forEach(index => {
             counter += index.length
           })
-          counter += userQueue.length
-          counter += joinQueue.length
+          counter += userQueue.queue.length
+          counter += joinQueue.queue.length
           bot.sendMessage(userId, "Текущий онлайн: "+ counter + " человек")
         } catch (error) {
           console.log(error)
