@@ -344,7 +344,7 @@ async function joinChat(userId, username){
     if(joinQueue.isUserInQueue(userId)){
       text = "Вы уже в поиске"
     }else{
-      text = 'Ждем освобождения места в чате...'
+      text = 'Ждем освобождения места в чатах \n Если поиск занимает много времени, то, возможно, свободных мест нет('
       joinQueue.add(userId, username);
     }
   }
@@ -394,15 +394,21 @@ async function stopSearchOrDialog(userId) {
 
 
 function checkIfUserInDialog(userId) {
-  let returnStatement = false
-  chatList.forEach((element1) => {
-    element1.forEach((element2) => {
-      if (element2.id == userId) {
-        returnStatement = true;
-      }
+  try {
+    let returnStatement = false
+    chatList.forEach((element1) => {
+      element1.forEach((element2) => {
+        if(element2.id){
+          if (element2.id == userId) {
+            returnStatement = true;
+          }
+        }
+      });
     });
-  });
   return returnStatement;
+  } catch (error) {
+    return false
+  }
 }
 
 function checkAndExitFromQueue(userId) {
@@ -505,8 +511,10 @@ function findUser(senderId){
   let isUser = null
   chatList.forEach((chat) => {
     chat.forEach((waitUser) => {
-      if (waitUser.id == senderId) {
-        isUser = waitUser
+      if(waitUser.id){
+        if (waitUser.id == senderId) {
+          isUser = waitUser
+        }
       }
     });
   });
@@ -545,11 +553,21 @@ async function pickUserToKick(senderId){
 // основаня функция запуска
 
 async function run() {
+ try {
   if (userQueue.checkIfCouldBeInitialized()) {
     let listOfPeople = userQueue.find();
     chatList.push(listOfPeople);
     listOfPeople.forEach(element => {
-      bot.sendMessage(element.id, `Собеседник найден! \nВаш цвет: <tg-emoji emoji-id="5368324170671202286">${element.colour}</tg-emoji>`,{disable_web_page_preview: true,
+      bot.sendMessage(element.id, `Собеседник найден! \nВаш цвет: <tg-emoji emoji-id="5368324170671202286">${element.colour}</tg-emoji> \n\n/stop - выйти из чата \n/next - следующий диалог \n/kick - голосование за исключение \n \nhttps://t.me/TriadColours_Bot`,{disable_web_page_preview: true,
+        parse_mode: `HTML`});
+    });
+  }
+
+  if (joinQueue.checkIfCouldBeInitialized()) {
+    let listOfPeople = joinQueue.find();
+    chatList.push(listOfPeople);
+    listOfPeople.forEach(element => {
+      bot.sendMessage(element.id, `Увы подключиться в чат не вышло, но в очереди ожидания хватило места, дабы начать новый чат! \nВаш цвет: <tg-emoji emoji-id="5368324170671202286">${element.colour}</tg-emoji> \n\n/stop - выйти из чата \n/next - следующий диалог \n/kick - голосование за исключение \n \nhttps://t.me/TriadColours_Bot` ,{disable_web_page_preview: true,
         parse_mode: `HTML`});
     });
   }
@@ -575,6 +593,9 @@ async function run() {
       chatWithoutUser.push(joinedUser)
     }
   }
+ } catch (error) {
+    console.log(error)
+ }
 }
 
 function toEscapeMSg(string){
@@ -619,3 +640,16 @@ function getOnline(userId){
 }
 
 removeDuplicateUsers();
+
+async function onStart(){
+  try {
+    const usersSnapshot = await usersDb.get();
+  
+      usersSnapshot.forEach((userDoc) => {
+        const userId = userDoc.data().id;
+        bot.sendMessage(userId, "🛠Исправления🛠 \n -Теперь если определенное количество участников захотят войти в очередь присоединения, то им создадут чат \n \n -Добавил контекста поиску и командам \n\n Все чаты перезапущены с ботом \n Приятного общения!")
+    });
+  } catch (error) {
+    console.log(error)
+  }
+}
