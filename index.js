@@ -1,5 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
-const token = '6271769906:AAHZpJDpkWpxnxWpi8PohIZp66ZZ-1AcAxk';
+const token = '';
+const donateToken = "";
 const bot = new TelegramBot(token, {polling: true});
 bot.setMyCommands([{ command: '/start', description: 'Найти чат' },
                    { command: '/join', description: 'Подключиться к активному чату' },
@@ -144,6 +145,7 @@ initializeApp({
 })
 
 const db = getFirestore()
+db.settings({ ignoreUndefinedProperties: true })
 var userQueue = new UserQueue();
 var joinQueue = new UserQueue();
 var chatList = [];
@@ -155,57 +157,66 @@ const usersDb = db.collection('users');
 // Когда приходит сообщение боту, то оно встает в очередь в самом API 
 
 bot.on('message', async (msg) => {
-  if (!msg.from.is_bot) {
-    console.log(msg);
-    const userId = msg.from.id;
-    const username = msg.from.username;
-    await createUser(userId, username, msg);
-    switch (msg.text) {
-      case '/start':
-        await startSearch(userId,username);
-        break;
-      case '/join':
-        await joinChat(userId,username);
-        break;
-      case '/stop':
-        await stopSearchOrDialog(userId);
-        break;
-      case "/next":
-        await stopSearchOrDialog(userId);
-        await startSearch(userId, username);
-        break;
-      case "/share":
-        if(checkIfUserInDialog(userId)){
-          forwardLinkToUsers(userId)
-        }else{
-          bot.sendMessage(userId, "Вы ещё не в диалоге")
-        }
-        break;
-      case "/kick":
-        if(!checkIfUserKicked(userId)){
-          pickUserToKick(userId);
-        }else{
-          bot.sendMessage(userId, "Вы уже проголосовали")
-        }
-        break;
-      case "/online":
-        getOnline(userId);
-        break;
-      case "/report_bug":
-        bot.sendMessage(userId, "Написать разработчику можно тут:\nhttps://forms.gle/WtXAR18VboHfbGvf6")
-        break;
-      case "/donate":
-        openDonutButton(userId);
-        break;
-      default:
-        if(checkIfUserInDialog(userId)){
-          forwardMessageToUsers(userId, msg)
-        }else{
-          bot.sendMessage(userId, "Вы ещё не в диалоге")
-        }
-        break;
+  try {
+    if (!msg.from.is_bot) {
+      console.log(msg);
+      const userId = msg.from.id;
+      const username = msg.from.username;
+      await createUser(userId, username, msg);
+      switch (msg.text) {
+        case '/start':
+          await startSearch(userId,username);
+          break;
+        case '/join':
+          await joinChat(userId,username);
+          break;
+        case '/stop':
+          await stopSearchOrDialog(userId);
+          break;
+        case "/next":
+          await stopSearchOrDialog(userId);
+          await startSearch(userId, username);
+          break;
+        case "/share":
+          if(checkIfUserInDialog(userId)){
+            if(username){
+              forwardLinkToUsers(userId)
+            }else{
+              bot.sendMessage(userId, "У вас нет username в телеграмме (@ваш_ник), потому поделиться невозможно")
+            }
+          }else{
+            bot.sendMessage(userId, "Вы ещё не в диалоге")
+          }
+          break;
+        case "/kick":
+          if(!checkIfUserKicked(userId)){
+            pickUserToKick(userId);
+          }else{
+            bot.sendMessage(userId, "Вы уже проголосовали")
+          }
+          break;
+        case "/online":
+          getOnline(userId);
+          break;
+        case "/report_bug":
+          bot.sendMessage(userId, "Написать разработчику можно тут:\nhttps://forms.gle/WtXAR18VboHfbGvf6")
+          break;
+        case "/donate":
+          openDonutButton(userId);
+          break;
+        default:
+          if(checkIfUserInDialog(userId)){
+            forwardMessageToUsers(userId, msg)
+          }else{
+            bot.sendMessage(userId, "Вы ещё не в диалоге")
+          }
+          break;
+      }
+      run();
     }
-    run();
+  } catch (error) {
+    bot.sendMessage(msg.from.id, "Что-то, пошло не так... \n Попробуйте снова или используйте /report_bug")
+    console.log(error)
   }
 });
 
@@ -257,7 +268,7 @@ bot.on('callback_query', function onCallbackQuery(callbackQuery) {
                   {label: "На корм котикам", amount: 50000}
               ]
     bot.sendInvoice(senderId,"На корм котикам 🐈", "Если вам нравится то, что я сделал, то поддержите будущие мои проекты", 
-  "donate","535936410:LIVE:6271769906_1c7d48e4-261d-42b3-8cef-d4da926124c5", "UAH", [price[price_amount]])
+  "donate",donateToken, "UAH", [price[price_amount]])
   }
 });
 
@@ -265,7 +276,13 @@ bot.on('callback_query', function onCallbackQuery(callbackQuery) {
 
 async function createUser(id, username, msg) {
   try {
-    const userSnapshot = await usersDb.where('username', '==', username).get();
+    var userSnapshot;
+    if (username){
+      userSnapshot = await usersDb.where('username', '==', username).get();
+    }else{
+      userSnapshot = await usersDb.where('id', '==', id).get();
+      username = "none"
+    }
     if (userSnapshot.empty) {
       const userJson = {
         id: id,
@@ -647,7 +664,7 @@ async function onStart(){
   
       usersSnapshot.forEach((userDoc) => {
         const userId = userDoc.data().id;
-        bot.sendMessage(userId, "🛠Исправления🛠 \n -Теперь если определенное количество участников захотят войти в очередь присоединения, то им создадут чат \n \n -Добавил контекста поиску и командам \n\n Все чаты перезапущены с ботом \n Приятного общения!")
+        bot.sendMessage(userId, "🛠Исправления🛠 \n -Починил застаивание сервера \n\n -Пользователь не мог поделиться аккаунтом без никнейма \n\n Приятного общения!")
     });
   } catch (error) {
     console.log(error)
