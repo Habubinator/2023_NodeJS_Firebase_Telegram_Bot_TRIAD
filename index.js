@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
-const token = '';
-const donateToken = "";
+const token = '6271769906:AAExAD222WQWRjB3OeBT8sN1AFuvOOWblds';
+const donateToken = "535936410:LIVE:6271769906_1c7d48e4-261d-42b3-8cef-d4da926124c5";
 const bot = new TelegramBot(token, {polling: true});
 bot.setMyCommands([{ command: '/start', description: 'Найти чат' },
                    { command: '/join', description: 'Подключиться к активному чату' },
