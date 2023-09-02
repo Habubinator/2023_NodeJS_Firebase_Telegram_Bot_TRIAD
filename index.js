@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
-const token = '6271769906:AAExAD222WQWRjB3OeBT8sN1AFuvOOWblds';
-const donateToken = "535936410:LIVE:6271769906_1c7d48e4-261d-42b3-8cef-d4da926124c5";
+const token = '';
+const donateToken = "";
 const bot = new TelegramBot(token, {polling: true});
 bot.setMyCommands([{ command: '/start', description: 'Найти чат' },
                    { command: '/join', description: 'Подключиться к активному чату' },
@@ -457,35 +457,22 @@ function forwardMessageToUsers(senderId, message) {
           if(message.text){
             bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:\n` + toEscapeMSg(message.text), {disable_web_page_preview: true,
               parse_mode: `HTML`});
-          }else if (message.sticker){
+          }else {
             bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:`, {disable_web_page_preview: true,
               parse_mode: `HTML`}).then(() => {
-            bot.sendSticker(waitUser.id, message.sticker.file_id);
-            })
-          } else if(message.photo){
-            bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:`, {disable_web_page_preview: true,
-              parse_mode: `HTML`}).then(() => {
+            if (message.sticker){
+              bot.sendSticker(waitUser.id, message.sticker.file_id);
+            } else if(message.photo){
               bot.sendPhoto(waitUser.id, message.photo[3].file_id);
-            })
-          } else if(message.video){
-            bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:`, {disable_web_page_preview: true,
-              parse_mode: `HTML`}).then(() => {
+            } else if(message.video){
               bot.sendVideo(waitUser.id, message.video.file_id);
-            })
-          } else if(message.voice){
-            bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:`, {disable_web_page_preview: true,
-              parse_mode: `HTML`}).then(() => {
+            } else if(message.voice){
               bot.sendVoice(waitUser.id, message.voice.file_id);
-            })
-          }else if(message.video_note){
-            bot.sendMessage(waitUser.id, `Аноним <tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:`, {disable_web_page_preview: true,
-              parse_mode: `HTML`}).then(() => {
+            }else if(message.video_note){
               bot.sendVideoNote(waitUser.id, message.video_note.file_id);
-            })
-          }else if(message.document){
-            bot.sendMessage(waitUser.id, `Аноним<tg-emoji emoji-id="5368324170671202286">${sender.colour}</tg-emoji>:`, {disable_web_page_preview: true,
-              parse_mode: `HTML`}).then(() => {
+            }else if(message.document){
               bot.sendDocument(waitUser.id, message.document.file_id);
+            }
             })
           }
         } catch (error) {
